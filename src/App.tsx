@@ -39,6 +39,7 @@ interface FloatingElement {
 function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>();
+  const lastTimeRef = useRef<number>(0);
   const [stars, setStars] = useState<Star[]>([]);
   const [textStars, setTextStars] = useState<Star[]>([]);
   const [shootingStars, setShootingStars] = useState<ShootingStar[]>([]);
@@ -279,7 +280,7 @@ function App() {
     ctx.restore();
   };
 
-  // Animation loop
+  // Animation loop with delta time for consistent performance
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || (stars.length === 0 && textStars.length === 0)) return;
@@ -289,7 +290,13 @@ function App() {
 
     let animationId: number;
     
-    const animate = () => {
+    const animate = (currentTime: number) => {
+      const deltaTime = currentTime - lastTimeRef.current;
+      lastTimeRef.current = currentTime;
+      
+      // Normalize delta time to 60fps (16.67ms per frame)
+      const normalizedDelta = Math.min(deltaTime / 16.67, 2);
+      
       // Create gradient background
       const gradient = ctx.createRadialGradient(
         dimensions.width / 2, dimensions.height / 2, 0,
@@ -304,9 +311,9 @@ function App() {
       
       // Update and draw floating elements
       setFloatingElements(prev => prev.map(element => {
-        element.x += element.vx;
-        element.y += element.vy;
-        element.rotation += element.rotationSpeed;
+        element.x += element.vx * normalizedDelta;
+        element.y += element.vy * normalizedDelta;
+        element.rotation += element.rotationSpeed * normalizedDelta;
         
         // Wrap around screen
         if (element.x < -50) element.x = dimensions.width + 50;
@@ -318,23 +325,23 @@ function App() {
         return element;
       }));
       
-      // Update and draw all stars (heart + text)
+      // Update and draw all stars (heart + text) with consistent timing
       const allStars = [...stars, ...textStars];
       allStars.forEach(star => {
         const dx = star.originalX - star.x;
         const dy = star.originalY - star.y;
-        const springForce = 0.008;
-        const damping = 0.95;
+        const springForce = 0.012 * normalizedDelta; // Increased for more consistent response
+        const damping = Math.pow(0.92, normalizedDelta); // Frame-rate independent damping
         
         star.vx += dx * springForce;
         star.vy += dy * springForce;
         star.vx *= damping;
         star.vy *= damping;
         
-        star.x += star.vx;
-        star.y += star.vy;
+        star.x += star.vx * normalizedDelta;
+        star.y += star.vy * normalizedDelta;
         
-        star.twinkle += 0.03;
+        star.twinkle += 0.05 * normalizedDelta;
         
         const twinkleAlpha = (Math.sin(star.twinkle) + 1) * 0.5;
         const alpha = star.brightness * (0.5 + twinkleAlpha * 0.5);
@@ -357,7 +364,7 @@ function App() {
         ctx.restore();
       });
       
-      // Update and draw shooting stars
+      // Update and draw shooting stars with consistent timing
       setShootingStars(prevShootingStars => {
         return prevShootingStars.filter(shootingStar => {
           shootingStar.trail.unshift({ 
@@ -374,8 +381,8 @@ function App() {
             point.alpha = 1 - (i / shootingStar.trail.length);
           });
           
-          shootingStar.x += shootingStar.vx;
-          shootingStar.y += shootingStar.vy;
+          shootingStar.x += shootingStar.vx * normalizedDelta;
+          shootingStar.y += shootingStar.vy * normalizedDelta;
           
           // Check collision with all stars
           allStars.forEach(star => {
@@ -384,7 +391,7 @@ function App() {
             const distance = Math.sqrt(dx * dx + dy * dy);
             
             if (distance < 35) {
-              const force = Math.max(0, 35 - distance) * 0.15;
+              const force = Math.max(0, 35 - distance) * 0.2 * normalizedDelta;
               const angle = Math.atan2(dy, dx);
               star.vx += Math.cos(angle) * force;
               star.vy += Math.sin(angle) * force;
@@ -475,7 +482,8 @@ function App() {
       animationId = requestAnimationFrame(animate);
     };
     
-    animate();
+    lastTimeRef.current = performance.now();
+    animate(lastTimeRef.current);
     
     return () => {
       if (animationId) {
