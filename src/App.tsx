@@ -36,6 +36,12 @@ interface FloatingElement {
   alpha: number;
 }
 
+interface CenterHeart {
+  rotation: number;
+  glowIntensity: number;
+  glowTimer: number;
+}
+
 function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>();
@@ -44,6 +50,11 @@ function App() {
   const [textStars, setTextStars] = useState<Star[]>([]);
   const [shootingStars, setShootingStars] = useState<ShootingStar[]>([]);
   const [floatingElements, setFloatingElements] = useState<FloatingElement[]>([]);
+  const [centerHeart, setCenterHeart] = useState<CenterHeart>({
+    rotation: 0,
+    glowIntensity: 0,
+    glowTimer: 0
+  });
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [showMessage, setShowMessage] = useState(false);
 
@@ -128,6 +139,87 @@ function App() {
     }
     
     return elements;
+  };
+
+  // Draw 3D rotating heart in center
+  const draw3DHeartCenter = (ctx: CanvasRenderingContext2D, heart: CenterHeart) => {
+    const centerX = dimensions.width / 2;
+    const centerY = dimensions.height / 2 - 50;
+    const baseSize = 20; // Fixed size
+    
+    ctx.save();
+    ctx.translate(centerX, centerY);
+    ctx.rotate(heart.rotation);
+    
+    // Create 3D effect with multiple layers
+    const layers = 6;
+    for (let layer = 0; layer < layers; layer++) {
+      const layerOffset = (layers - layer - 1) * 1.5;
+      const layerSize = baseSize + layerOffset;
+      const layerAlpha = 0.3 + (layer / layers) * 0.7;
+      
+      ctx.save();
+      
+      // Add glow effect when glowing
+      if (heart.glowIntensity > 0) {
+        ctx.shadowColor = '#ff0040';
+        ctx.shadowBlur = 15 + (heart.glowIntensity * 25);
+        ctx.globalAlpha = layerAlpha + (heart.glowIntensity * 0.5);
+      } else {
+        ctx.globalAlpha = layerAlpha;
+      }
+      
+      // Create gradient for 3D effect
+      const gradient = ctx.createLinearGradient(-layerSize, -layerSize, layerSize, layerSize);
+      if (layer === layers - 1) {
+        // Top layer - brightest
+        gradient.addColorStop(0, '#ff6b8a');
+        gradient.addColorStop(0.3, '#ff1744');
+        gradient.addColorStop(0.7, '#d50000');
+        gradient.addColorStop(1, '#b71c1c');
+      } else {
+        // Lower layers - darker for depth
+        const darkness = 0.4 + (layer / layers) * 0.6;
+        gradient.addColorStop(0, `rgba(255, 107, 138, ${darkness})`);
+        gradient.addColorStop(0.5, `rgba(255, 23, 68, ${darkness})`);
+        gradient.addColorStop(1, `rgba(183, 28, 28, ${darkness})`);
+      }
+      
+      ctx.fillStyle = gradient;
+      
+      // Draw heart shape (💖 style)
+      ctx.beginPath();
+      ctx.moveTo(0, layerSize * 0.3);
+      ctx.bezierCurveTo(-layerSize * 0.5, -layerSize * 0.2, -layerSize, -layerSize * 0.2, -layerSize * 0.5, layerSize * 0.1);
+      ctx.bezierCurveTo(-layerSize * 0.5, layerSize * 0.3, 0, layerSize * 0.6, 0, layerSize);
+      ctx.bezierCurveTo(0, layerSize * 0.6, layerSize * 0.5, layerSize * 0.3, layerSize * 0.5, layerSize * 0.1);
+      ctx.bezierCurveTo(layerSize, -layerSize * 0.2, layerSize * 0.5, -layerSize * 0.2, 0, layerSize * 0.3);
+      ctx.fill();
+      
+      ctx.restore();
+    }
+    
+    // Add sparkle effect when glowing intensely
+    if (heart.glowIntensity > 0.5) {
+      const sparkles = 8;
+      for (let i = 0; i < sparkles; i++) {
+        const angle = (i / sparkles) * Math.PI * 2;
+        const distance = baseSize * 1.8;
+        const sparkleX = Math.cos(angle) * distance;
+        const sparkleY = Math.sin(angle) * distance;
+        
+        ctx.globalAlpha = heart.glowIntensity;
+        ctx.fillStyle = '#ffffff';
+        ctx.shadowColor = '#ffffff';
+        ctx.shadowBlur = 8;
+        
+        ctx.beginPath();
+        ctx.arc(sparkleX, sparkleY, 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    
+    ctx.restore();
   };
 
   // Initialize dimensions
@@ -309,6 +401,52 @@ function App() {
       ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       
+      // Update center heart rotation and glow
+      setCenterHeart(prev => {
+        let newGlowIntensity = prev.glowIntensity;
+        let newGlowTimer = prev.glowTimer;
+        
+        // Check if any stars are being distorted (moved from original position)
+        const centerX = dimensions.width / 2;
+        const centerY = dimensions.height / 2 - 50;
+        
+        let hasDistortion = false;
+        const allStars = [...stars, ...textStars];
+        
+        allStars.forEach(star => {
+          const dx = star.x - star.originalX;
+          const dy = star.y - star.originalY;
+          const distortion = Math.sqrt(dx * dx + dy * dy);
+          
+          // Check if star is near center and distorted
+          const starToCenterDx = star.originalX - centerX;
+          const starToCenterDy = star.originalY - centerY;
+          const distanceToCenter = Math.sqrt(starToCenterDx * starToCenterDx + starToCenterDy * starToCenterDy);
+          
+          if (distortion > 5 && distanceToCenter < 150) {
+            hasDistortion = true;
+          }
+        });
+        
+        // Trigger glow when distortion is detected
+        if (hasDistortion) {
+          newGlowIntensity = 1;
+          newGlowTimer = 180; // 3 seconds at 60fps
+        } else if (newGlowTimer > 0) {
+          // Gradually fade glow over 3 seconds
+          newGlowTimer -= normalizedDelta;
+          newGlowIntensity = Math.max(0, newGlowTimer / 180);
+        } else {
+          newGlowIntensity = 0;
+        }
+        
+        return {
+          rotation: prev.rotation + 0.03 * normalizedDelta, // Rotate on axis
+          glowIntensity: newGlowIntensity,
+          glowTimer: Math.max(0, newGlowTimer)
+        };
+      });
+      
       // Update and draw floating elements
       setFloatingElements(prev => prev.map(element => {
         element.x += element.vx * normalizedDelta;
@@ -363,6 +501,9 @@ function App() {
         
         ctx.restore();
       });
+      
+      // Draw the 3D rotating heart in center
+      draw3DHeartCenter(ctx, centerHeart);
       
       // Update and draw shooting stars with consistent timing
       setShootingStars(prevShootingStars => {
@@ -490,7 +631,7 @@ function App() {
         cancelAnimationFrame(animationId);
       }
     };
-  }, [stars, textStars, dimensions]);
+  }, [stars, textStars, dimensions, centerHeart]);
 
   return (
     <div className="w-full h-screen overflow-hidden bg-black cursor-crosshair relative">
