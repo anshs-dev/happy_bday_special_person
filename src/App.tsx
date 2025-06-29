@@ -42,13 +42,6 @@ interface CenterHeart {
   glowTimer: number;
 }
 
-interface TimeLeft {
-  days: number;
-  hours: number;
-  minutes: number;
-  seconds: number;
-}
-
 function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>();
@@ -64,59 +57,6 @@ function App() {
   });
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [showMessage, setShowMessage] = useState(false);
-  const [timeLeft, setTimeLeft] = useState<TimeLeft>({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-  const [isBirthdayToday, setIsBirthdayToday] = useState(false);
-
-  // Calculate time left until birthday
-  const calculateTimeLeft = useCallback(() => {
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    
-    // Birthday is August 4th
-    let birthday = new Date(currentYear, 7, 4); // Month is 0-indexed, so 7 = August
-    
-    // If birthday has passed this year, set it for next year
-    if (now > birthday) {
-      birthday = new Date(currentYear + 1, 7, 4);
-    }
-    
-    const difference = birthday.getTime() - now.getTime();
-    
-    // Check if it's birthday today
-    const today = new Date();
-    const todayMonth = today.getMonth();
-    const todayDate = today.getDate();
-    
-    if (todayMonth === 7 && todayDate === 4) { // August 4th
-      setIsBirthdayToday(true);
-      return { days: 0, hours: 0, minutes: 0, seconds: 0 };
-    }
-    
-    setIsBirthdayToday(false);
-    
-    if (difference > 0) {
-      return {
-        days: Math.floor(difference / (1000 * 60 * 60 * 24)),
-        hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
-        minutes: Math.floor((difference / 1000 / 60) % 60),
-        seconds: Math.floor((difference / 1000) % 60)
-      };
-    }
-    
-    return { days: 0, hours: 0, minutes: 0, seconds: 0 };
-  }, []);
-
-  // Update countdown timer every second
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setTimeLeft(calculateTimeLeft());
-    }, 1000);
-
-    // Initial calculation
-    setTimeLeft(calculateTimeLeft());
-
-    return () => clearInterval(timer);
-  }, [calculateTimeLeft]);
 
   // Generate heart shape coordinates
   const generateHeartShape = (centerX: number, centerY: number, scale: number = 1) => {
@@ -702,58 +642,6 @@ function App() {
         onClick={handleCanvasClick}
         className="block"
       />
-      
-      {/* Countdown Timer - Top Center */}
-      <div className="absolute top-8 left-1/2 transform -translate-x-1/2 pointer-events-none">
-        {isBirthdayToday ? (
-          <div className="text-center">
-            <div className="text-3xl md:text-5xl font-bold bg-gradient-to-r from-pink-400 via-purple-500 to-yellow-400 bg-clip-text text-transparent animate-pulse">
-              🎉 IT'S ANSHU'S BIRTHDAY TODAY! 🎉
-            </div>
-            <div className="text-lg md:text-xl text-white font-light opacity-90 mt-2">
-              The most special day of the year! ✨
-            </div>
-          </div>
-        ) : (
-          <div className="text-center bg-black/30 backdrop-blur-sm rounded-2xl px-6 py-4 border border-pink-500/20">
-            <div className="text-lg md:text-xl text-pink-300 font-light mb-3">
-              ⏰ Countdown to Anshu's Birthday
-            </div>
-            <div className="flex justify-center space-x-4 md:space-x-6">
-              <div className="text-center">
-                <div className="text-2xl md:text-4xl font-bold text-white bg-gradient-to-b from-pink-400 to-purple-600 bg-clip-text text-transparent">
-                  {timeLeft.days.toString().padStart(2, '0')}
-                </div>
-                <div className="text-xs md:text-sm text-pink-300 font-light">DAYS</div>
-              </div>
-              <div className="text-2xl md:text-4xl text-pink-400 font-bold">:</div>
-              <div className="text-center">
-                <div className="text-2xl md:text-4xl font-bold text-white bg-gradient-to-b from-pink-400 to-purple-600 bg-clip-text text-transparent">
-                  {timeLeft.hours.toString().padStart(2, '0')}
-                </div>
-                <div className="text-xs md:text-sm text-pink-300 font-light">HOURS</div>
-              </div>
-              <div className="text-2xl md:text-4xl text-pink-400 font-bold">:</div>
-              <div className="text-center">
-                <div className="text-2xl md:text-4xl font-bold text-white bg-gradient-to-b from-pink-400 to-purple-600 bg-clip-text text-transparent">
-                  {timeLeft.minutes.toString().padStart(2, '0')}
-                </div>
-                <div className="text-xs md:text-sm text-pink-300 font-light">MINS</div>
-              </div>
-              <div className="text-2xl md:text-4xl text-pink-400 font-bold">:</div>
-              <div className="text-center">
-                <div className="text-2xl md:text-4xl font-bold text-white bg-gradient-to-b from-pink-400 to-purple-600 bg-clip-text text-transparent animate-pulse">
-                  {timeLeft.seconds.toString().padStart(2, '0')}
-                </div>
-                <div className="text-xs md:text-sm text-pink-300 font-light">SECS</div>
-              </div>
-            </div>
-            <div className="text-sm md:text-base text-yellow-300 font-light mt-3">
-              August 4th • The most awaited day! 🌟
-            </div>
-          </div>
-        )}
-      </div>
       
       {/* Birthday Message Overlay - Moved to BOTTOM */}
       <div className={`absolute bottom-20 left-1/2 transform -translate-x-1/2 pointer-events-none transition-opacity duration-2000 ${showMessage ? 'opacity-100' : 'opacity-0'}`}>
